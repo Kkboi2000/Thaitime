@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Time in Thai</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      transition: background 0.5s;
+      position: relative;
+      overflow: hidden;
+      flex-direction: column;
+    }
+
+    /* Background image with low opacity */
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url("https://i.imgur.com/zYjNnWR.png") center/cover no-repeat;
+      opacity: 0.03;
+      z-index: -1;
+    }
+
+    h1 {
+      margin-top: 20px;
+      margin-bottom: 20px;
+      font-size: 72px; /* 48px → 50% bigger */
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .container {
+      display: flex;
+      gap: 60px; /* 40px → 50% bigger */
+      align-items: center;
+    }
+
+    .clock {
+      width: 375px;   /* 250px → 50% bigger */
+      height: 375px;
+      border: 4.5px solid #333;
+      border-radius: 50%;
+      position: relative;
+      background: white;
+    }
+
+    .hand {
+      width: 6px;    /* 4px → 50% bigger */
+      height: 113px; /* 75px → 50% bigger */
+      background: #333;
+      position: absolute;
+      top: 79px;     /* 53px → 50% bigger */
+      left: 50%;
+      transform-origin: bottom;
+      transform: rotate(0deg);
+      transition: transform 0.35s linear;
+    }
+
+    .number {
+      position: absolute;
+      width: 45px;   /* 30px → 50% bigger */
+      height: 45px;
+      font-size: 42px; /* 28px → 50% bigger */
+      text-align: center;
+      line-height: 45px;
+      font-weight: bold;
+      user-select: none;
+    }
+
+    .board {
+      background: #fff;
+      border: 3px solid #333;
+      padding: 30px;  /* 20px → 50% bigger */
+      border-radius: 18px;
+      min-width: 300px; /* 200px → 50% bigger */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .time-en {
+      font-size: 36px; /* 24px → 50% bigger */
+      font-weight: bold;
+    }
+
+    .time-thai {
+      font-size: 25px; /* 17px → 50% bigger */
+      margin-top: 6px;
+      color: #555;
+    }
+
+    .buttons {
+      margin-top: 22px; /* 15px → 50% bigger */
+    }
+
+    button {
+      font-size: 30px; /* 20px → 50% bigger */
+      margin: 0 15px;
+      padding: 8px 15px; /* 5px 10px → 50% bigger */
+      cursor: pointer;
+    }
+
+    .controls {
+      position: absolute;
+      top: 30px;   /* 20px → 50% bigger */
+      left: 30px;
+      font-size: 150%; /* was 130% */
+      font-weight: bold;
+    }
+
+    .mode-box {
+      margin-top: 12px; /* 8px → 50% bigger */
+      padding: 9px 18px; /* 6px 12px → 50% bigger */
+      border: 3px solid #333;
+      border-radius: 9px;
+      background: #eee;
+      text-align: center;
+      width: 120px; /* 80px → 50% bigger */
+    }
+
+    /* Language selector */
+    .language-selector {
+      position: absolute;
+      top: 30px;
+      right: 30px;
+      font-size: 18px;
+    }
+
+    .language-selector select {
+      font-size: 18px;
+      padding: 8px 12px;
+      border: 2px solid #333;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <div id="modeLabel">Mode:</div>
+    <div class="mode-box" id="modeBox">Day</div>
+  </div>
+
+  <div class="language-selector">
+    <select id="languageSelect">
+      <option value="en">English</option>
+      <option value="ja">日本語</option>
+      <option value="th">ภาษาไทย</option>
+    </select>
+  </div>
+
+  <h1 id="title">Time in Thai language</h1>
+
+  <div class="container">
+    <div class="clock" id="clock">
+      <div class="hand" id="hourHand"></div>
+    </div>
+
+    <div class="board">
+      <div class="time-en" id="timeEn">--:--</div>
+      <div class="time-thai" id="timeThai">---</div>
+      <div class="buttons">
+        <button id="decrease">⟲</button>
+        <button id="increase">⟳</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const hand = document.getElementById('hourHand');
+    const timeEn = document.getElementById('timeEn');
+    const timeThai = document.getElementById('timeThai');
+    const modeBox = document.getElementById('modeBox');
+    const modeLabel = document.getElementById('modeLabel');
+    const title = document.getElementById('title');
+    const languageSelect = document.getElementById('languageSelect');
+
+    // Language texts
+    const languageTexts = {
+      en: {
+        title: "Time in Thai language",
+        modeLabel: "Mode:",
+        day: "Day",
+        night: "Night"
+      },
+      ja: {
+        title: "タイ語の時間",
+        modeLabel: "モード",
+        day: "昼",
+        night: "夜"
+      },
+      th: {
+        title: "เวลาในภาษาไทย",
+        modeLabel: "โหมด",
+        day: "กลางวัน",
+        night: "กลางคืน"
+      }
+    };
+
+    // draw numbers 1-12 around the clock
+    const clock = document.getElementById('clock');
+    const center = 187.5; // half of 375
+    const radius = 150;   // 100 * 1.5
+
+    for (let i = 1; i <= 12; i++) {
+      const num = document.createElement('div');
+      num.className = 'number';
+      num.textContent = i;
+      const angle = (i - 3) * 30 * Math.PI / 180;
+      const x = center + radius * Math.cos(angle) - 22.5;
+      const y = center + radius * Math.sin(angle) - 22.5;
+      num.style.left = x + 'px';
+      num.style.top = y + 'px';
+      clock.appendChild(num);
+    }
+
+    const dayTimeline = [
+      {h:6, period:'AM'}, {h:7, period:'AM'}, {h:8, period:'AM'}, {h:9, period:'AM'}, {h:10, period:'AM'}, {h:11, period:'AM'},
+      {h:12, period:'PM'}, {h:1, period:'PM'}, {h:2, period:'PM'}, {h:3, period:'PM'}, {h:4, period:'PM'}, {h:5, period:'PM'}
+    ];
+
+    const nightTimeline = [
+      {h:6, period:'PM'}, {h:7, period:'PM'}, {h:8, period:'PM'}, {h:9, period:'PM'}, {h:10, period:'PM'}, {h:11, period:'PM'},
+      {h:12, period:'AM'}, {h:1, period:'AM'}, {h:2, period:'AM'}, {h:3, period:'AM'}, {h:4, period:'AM'}, {h:5, period:'AM'}
+    ];
+
+    let isNight = false;
+    let index = 0;
+    let rotation = (dayTimeline[0].h % 12) * 30;
+    let currentLanguage = 'en';
+
+    function updateBackground() {
+      document.body.style.background = isNight ? '#add8e6' : '#ffd580';
+      const texts = languageTexts[currentLanguage];
+      modeBox.textContent = isNight ? texts.night : texts.day;
+    }
+
+    function toThai(h, period, isNightFlag) {
+      const tones = {
+        1: 'Neung(1)', 2: 'Soang(5)', 3: 'Saam(5)', 4: 'See(2)', 5: 'Haa(3)',
+        6: 'Hok(2)', 7: 'Jed(2)', 8: 'Paed(2)', 9: 'Kao(3)', 10: 'Sip(2)',
+        11: 'Sip(1) Ed(2)', 12: 'Sip(1) Song(5)'
+      };
+
+      // Japanese pronunciation
+      const japanese = {
+        1: 'ヌン', 2: 'ソーン', 3: 'サーム', 4: 'シー', 5: 'ハー',
+        6: 'ホック', 7: 'ジェット', 8: 'ペット', 9: 'ガオ', 10: 'シップ',
+        11: 'シップエット', 12: 'シップソーン'
+      };
+
+      // Thai pronunciation
+      const thai = {
+        1: 'หนึ่ง', 2: 'สอง', 3: 'สาม', 4: 'สี่', 5: 'ห้า',
+        6: 'หก', 7: 'เจ็ด', 8: 'แปด', 9: 'เก้า', 10: 'สิบ',
+        11: 'สิบเอ็ด', 12: 'สิบสอง'
+      };
+
+      if (!isNightFlag) { // Day mode
+        if (period === 'AM') {
+          if (h === 6) {
+            if (currentLanguage === 'ja') return 'ホックムーンカオ';
+            if (currentLanguage === 'th') return 'หกโมงเช้า';
+            return `Hok(2) Moong(1) Chau(4)`;
+          }
+          if (h >= 7 && h <= 11) {
+            if (currentLanguage === 'ja') return `${japanese[h]}モーン`;
+            if (currentLanguage === 'th') return `${thai[h]}โมง`;
+            return `${tones[h]}Moong(1)`;
+          }
+        } else {
+          if (h === 12) {
+            if (currentLanguage === 'ja') return 'ティアン';
+            if (currentLanguage === 'th') return 'เที่ยง';
+            return `Thiang(3)`;
+          }
+          if (h === 1) {
+            if (currentLanguage === 'ja') return 'バーイモーン';
+            if (currentLanguage === 'th') return 'บ่ายโมง';
+            return `Baay(2) Moong(1)`;
+          }
+          if (h === 2 || h === 3) {
+            if (currentLanguage === 'ja') return `バーイ${h === 2 ? 'ソーン' : 'サーム'}`;
+            if (currentLanguage === 'th') return `บ่าย${h === 2 ? 'สอง' : 'สาม'}`;
+            return `Baay(2) ${tones[h]} `;
+          }
+          if (h === 4 || h === 5) {
+            if (currentLanguage === 'ja') return japanese[h] + 'モーンイェン';
+            if (currentLanguage === 'th') return thai[h] + 'โมงเย็น';
+            return `${tones[h]} Moong(1) Yen(1)`;
+          }
+        }
+      }
+
+      if (isNightFlag) { // Night mode
+        if (period === 'PM') {
+          if (h === 6) {
+            if (currentLanguage === 'ja') return 'ホックムーンイェン';
+            if (currentLanguage === 'th') return 'หกโมงเย็น';
+            return `Hok(2) Moong(1) Yen(1)`;
+          }
+          if (h >= 7 && h <= 11) {
+            if (currentLanguage === 'ja') return japanese[h-6] + 'トゥム';
+            if (currentLanguage === 'th') return thai[h-6] + 'ทุ่ม';
+            return `${tones[h - 6]} Thum(3)`;
+          }
+        } else {
+          if (h === 12) {
+            if (currentLanguage === 'ja') return 'ティアンクーン';
+            if (currentLanguage === 'th') return 'เที่ยงคืน';
+            return `Thiang(3) Khuen(1)`;
+          }
+          if (h >= 1 && h <= 5) {
+            if (currentLanguage === 'ja') return `ティー${japanese[h]}`;
+            if (currentLanguage === 'th') return `ตี${h === 1 ? 'หนึ่ง' : h === 2 ? 'สอง' : h === 3 ? 'สาม' : h === 4 ? 'สี่' : 'ห้า'}`;
+            return `Tii(1) ${tones[h]}`;
+          }
+        }
+      }
+
+      return '---';
+    }
+
+    function setDisplayFromEntry(entry) {
+      timeEn.textContent = `${entry.h}:00 ${entry.period}`;
+      timeThai.textContent = toThai(entry.h, entry.period, isNight);
+      hand.style.transform = `rotate(${rotation}deg)`;
+    }
+
+    function increase() {
+      rotation += 30;
+      const seq = isNight ? nightTimeline : dayTimeline;
+      index++;
+      if (index >= seq.length) {
+        isNight = !isNight;
+        index = 0;
+      }
+      updateBackground();
+      const curr = isNight ? nightTimeline[index] : dayTimeline[index];
+      setDisplayFromEntry(curr);
+    }
+
+    function decrease() {
+      rotation -= 30;
+      const seq = isNight ? nightTimeline : dayTimeline;
+      index--;
+      if (index < 0) {
+        isNight = !isNight;
+        const newSeq = isNight ? nightTimeline : dayTimeline;
+        index = newSeq.length - 1;
+      }
+      updateBackground();
+      const curr = isNight ? nightTimeline[index] : dayTimeline[index];
+      setDisplayFromEntry(curr);
+    }
+
+    function changeLanguage() {
+      currentLanguage = languageSelect.value;
+      const texts = languageTexts[currentLanguage];
+      title.textContent = texts.title;
+      modeLabel.textContent = texts.modeLabel;
+      updateBackground();
+      
+      // Update the current display with new language
+      const curr = isNight ? nightTimeline[index] : dayTimeline[index];
+      setDisplayFromEntry(curr);
+    }
+
+    document.getElementById('increase').addEventListener('click', increase);
+    document.getElementById('decrease').addEventListener('click', decrease);
+    languageSelect.addEventListener('change', changeLanguage);
+
+    updateBackground();
+    const start = dayTimeline[0];
+    rotation = (start.h % 12) * 30;
+    setDisplayFromEntry(start);
+  </script>
+</body>
+</html>
+
+  </body>
+</html>
